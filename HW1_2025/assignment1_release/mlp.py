@@ -21,14 +21,20 @@ class Linear(nn.Module):
     """
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Linear, self).__init__()
-        raise NotImplementedError
+        self.in_features = in_features
+        self.out_features = out_features
+
+        # Initialize weight and bias
+        self.weight = nn.Parameter(torch.randn(out_features, in_features) * 0.01)
+        self.bias = nn.Parameter(torch.zeros(out_features))
     
-    def forward(self, input):
+    def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
-            :param input: [bsz, in_features]
-            :return result [bsz, out_features]
+            :param input: Tensor of shape [bsz, in_features]
+            :return result: Tensor of shape [bsz, out_features]
         """
-        raise NotImplementedError
+        # Apply the linear transformation: y = xA^T + b
+        return torch.nn.functional.linear(input, self.weight, self.bias)
 
 
 class MLP(torch.nn.Module):
@@ -41,9 +47,9 @@ class MLP(torch.nn.Module):
         self.num_classes = num_classes
         self.activation = activation
         assert activation in ['tanh', 'relu', 'sigmoid'], "Invalid choice of activation"
-        self.hidden_layers, self.output_layer = self._build_layers(input_size, hidden_sizes, num_classes)
+        self.hidden_layers, self.output_layer = self._build_layers(self.input_size, self.hidden_sizes, self.num_classes)
         
-        # Initializaton
+        # Initialization
         self._initialize_linear_layer(self.output_layer)
         for layer in self.hidden_layers:
             self._initialize_linear_layer(layer)
@@ -60,15 +66,31 @@ class MLP(torch.nn.Module):
             hidden_layers: nn.ModuleList. Within the list, each item has type nn.Module
             output_layer: nn.Module
         """
-        raise NotImplementedError
+        hidden_layers = nn.ModuleList()
+
+        # Building hidden layers
+        prev_size = input_size
+        for hidden_size in hidden_sizes:
+            hidden_layer = Linear(prev_size, hidden_size)
+            hidden_layers.append(self.activation_fn(self.activation, hidden_layer))
+            prev_size = hidden_size
+
+        # Build output layer
+        output_layer = nn.Linear(prev_size, num_classes)
+
+        return hidden_layers, output_layer
+
     
     def activation_fn(self, activation, inputs: torch.Tensor) -> torch.Tensor:
         """ process the inputs through different non-linearity function according to activation name """
-        raise NotImplementedError
+        return activation(inputs)
         
-    def _initialize_linear_layer(self, module: nn.Linear) -> None:
+    def _initialize_linear_layer(self, module: Linear) -> None:
         """ For bias set to zeros. For weights set to glorot normal """
-        raise NotImplementedError
+        if isinstance(module, Linear):  # Ensure it's a Linear layer
+            nn.init.xavier_normal_(module.weight)  # Glorot Normal initialization
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)  # Set bias to zero
         
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """ Forward images and compute logits.
@@ -79,4 +101,11 @@ class MLP(torch.nn.Module):
         :param images: [batch, channels, width, height]
         :return logits: [batch, num_classes]
         """
-        raise NotImplementedError
+        batch_size = images.shape[0]
+        x = images.view(batch_size, -1) # Flatten images to [batch, in_features]
+
+        for layer in self.hidden_layers:
+            x = layer(x)   # Pass through layers
+
+        logits = self.output_layer(x)   # Final output layer
+        return logits

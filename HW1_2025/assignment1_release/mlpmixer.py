@@ -18,6 +18,7 @@ class PatchEmbed(nn.Module):
         
         # Uncomment this line and replace ? with correct values
         #self.proj = nn.Conv2d(?, ?, kernel_size=?, stride=?)
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size =1, stride =2)
 
     def forward(self, x):
         """
