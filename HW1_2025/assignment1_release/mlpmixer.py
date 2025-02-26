@@ -1,6 +1,4 @@
 from torch import nn
-import torch
-import math
 import matplotlib.pyplot as plt
 import os
 
@@ -16,8 +14,6 @@ class PatchEmbed(nn.Module):
         self.grid_size = img_size // patch_size
         self.num_patches = self.grid_size * self.grid_size
         
-        # Uncomment this line and replace ? with correct values
-        #self.proj = nn.Conv2d(?, ?, kernel_size=?, stride=?)
         self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size =1, stride =2)
 
     def forward(self, x):
@@ -77,7 +73,9 @@ class MixerBlock(nn.Module):
         self.mlp_channels = Mlp(dim, channels_dim, act_layer=act_layer, drop=drop)
 
     def forward(self, x):
-        raise NotImplementedError
+        x += self.mlp_tokens(self.norm1(x).transpose(1, 2)).transpose(1, 2)
+        x += self.mlp_channels(self.norm2(x))
+        return x
     
 
 class MLPMixer(nn.Module):
@@ -114,14 +112,47 @@ class MLPMixer(nn.Module):
         :param images: [batch, 3, img_size, img_size]
         """
         # step1: Go through the patch embedding
+        out = self.patchemb(images)
         # step 2 Go through the mixer blocks
+        out = self.blocks(out)
         # step 3 go through layer norm
+        out = self.norm(out)
         # step 4 Global averaging spatially
+        out = out.mean(dim=1)
         # Classification
-        raise NotImplementedError
+        logits = self.head(out)
+        return logits
     
-    def visualize(self, logdir):
+    def visualize(self, logdir: str, layer_idx: int = 0):
         """ Visualize the token mixer layer 
         in the desired directory """
-        raise NotImplementedError
- 
+        # Ensure the directory exists
+        os.makedirs(logdir, exist_ok=True)
+
+        # Select the specified MixerBlock
+        if layer_idx >= len(self.blocks):
+            raise ValueError(f"Invalid layer index {layer_idx}. Must be in range 0 to {len(self.blocks) - 1}.")
+
+        mixer_block = self.blocks[layer_idx]
+
+        # Extract the weight matrix from the token mixing MLP
+        token_mixer_weights = mixer_block.mlp_tokens.fc1.weight.data.cpu().numpy()
+
+        # Normalize weights for visualization
+        min_val, max_val = token_mixer_weights.min(), token_mixer_weights.max()
+        token_mixer_weights = (token_mixer_weights - min_val) / (max_val - min_val)
+
+        # Plot the token mixing matrix
+        plt.figure(figsize=(8, 6))
+        plt.imshow(token_mixer_weights, cmap="viridis", aspect="auto")
+        plt.colorbar()
+        plt.title(f"Token Mixing Weights - Layer {layer_idx}")
+        plt.xlabel("Input Tokens")
+        plt.ylabel("Output Tokens")
+
+        # Save the visualization
+        save_path = os.path.join(logdir, f"token_mixer_layer_{layer_idx}.png")
+        plt.savefig(save_path)
+        plt.close()
+
+        print(f"Visualization saved at {save_path}")
