@@ -61,7 +61,17 @@ def cross_entropy_loss(logits: torch.Tensor, labels: torch.Tensor):
     :param labels: [batch_size]
     :return loss 
     """
-    raise NotImplementedError
+    # Convert logits to probabilities using softmax
+    probs = torch.softmax(logits, dim=1)
+
+    # Get the probability of the true class
+    true_class_probs = probs[torch.arange(labels.shape[0]), labels]
+
+    # Compute the negative log-likelihood
+    loss = -torch.log(true_class_probs)
+
+    # Return mean loss over the batch
+    return loss.mean()
 
 def compute_accuracy(logits: torch.Tensor, labels: torch.Tensor):
     """ Compute the accuracy of the batch """

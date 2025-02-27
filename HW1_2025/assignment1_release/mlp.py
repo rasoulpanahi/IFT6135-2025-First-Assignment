@@ -25,7 +25,7 @@ class Linear(nn.Module):
         self.out_features = out_features
 
         # Initialize weight and bias
-        self.weight = nn.Parameter(torch.randn(out_features, in_features) * 0.01)
+        self.weight = nn.Parameter(torch.randn(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
     
     def forward(self, input: torch.Tensor) -> torch.Tensor:
@@ -34,7 +34,7 @@ class Linear(nn.Module):
             :return result: Tensor of shape [bsz, out_features]
         """
         # Apply the linear transformation: y = xA^T + b
-        return torch.nn.functional.linear(input, self.weight, self.bias)
+        return torch.matmul(input, self.weight.T) + self.bias
 
 
 class MLP(torch.nn.Module):
@@ -72,25 +72,33 @@ class MLP(torch.nn.Module):
         prev_size = input_size
         for hidden_size in hidden_sizes:
             hidden_layer = Linear(prev_size, hidden_size)
-            hidden_layers.append(self.activation_fn(self.activation, hidden_layer))
+            self._initialize_linear_layer(hidden_layer)
+            hidden_layers.append(hidden_layer)
             prev_size = hidden_size
 
         # Build output layer
         output_layer = nn.Linear(prev_size, num_classes)
+        self._initialize_linear_layer(output_layer)
 
         return hidden_layers, output_layer
 
     
-    def activation_fn(self, activation, inputs: torch.Tensor) -> torch.Tensor:
-        """ process the inputs through different non-linearity function according to activation name """
-        return activation(inputs)
+    def activation_fn(self, activation: str, inputs: torch.Tensor) -> torch.Tensor:
+        """Process the inputs through different non-linearity functions according to the activation name. """
+        if activation == 'tanh':
+            return torch.tanh(inputs)  # Tanh is fine to use as it's not simple
+        elif activation == 'relu':
+            return torch.maximum(torch.tensor(0.0, device=inputs.device), inputs)  # Custom ReLU
+        elif activation == 'sigmoid':
+            return 1 / (1 + torch.exp(-inputs))  # Custom Sigmoid
         
     def _initialize_linear_layer(self, module: Linear) -> None:
         """ For bias set to zeros. For weights set to glorot normal """
-        if isinstance(module, Linear):  # Ensure it's a Linear layer
-            nn.init.xavier_normal_(module.weight)  # Glorot Normal initialization
-            if module.bias is not None:
-                nn.init.zeros_(module.bias)  # Set bias to zero
+        if isinstance(module, nn.Linear):  # Ensure it's a Linear layer
+            fan_in, fan_out = module.weight.shape  # Get input and output dimensions
+            std = torch.sqrt(torch.tensor(2.0 / (fan_in + fan_out)))  # Compute Xavier std
+            module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
+            module.bias.data.zero_()  # Set bias to zeros
         
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """ Forward images and compute logits.
@@ -102,10 +110,16 @@ class MLP(torch.nn.Module):
         :return logits: [batch, num_classes]
         """
         batch_size = images.shape[0]
-        x = images.view(batch_size, -1) # Flatten images to [batch, in_features]
 
+        # Step 1: Flatten the images
+        x = images.view(batch_size, -1)
+
+        # Step 2: Pass through hidden layers with activation
         for layer in self.hidden_layers:
             x = layer(x)   # Pass through layers
+            x = self.activation_fn(self.activation, x)  # Apply custom activation
 
-        logits = self.output_layer(x)   # Final output layer
+        # Step 3: Pass through the output layer
+        logits = self.output_layer(x)
+
         return logits
