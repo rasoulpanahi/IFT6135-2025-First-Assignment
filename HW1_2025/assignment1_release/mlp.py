@@ -2,6 +2,7 @@ import torch
 from typing import List, Tuple
 from torch import nn
 
+
 class Linear(nn.Module):
     r"""Applies a linear transformation to the incoming data: :math:`y = xA^T + b`
     Args:
@@ -12,13 +13,14 @@ class Linear(nn.Module):
           dimensions including none and :math:`H_{in} = \text{in\_features}`.
         - Output: :math:`(*, H_{out})` where all but the last dimension
           are the same shape as the input and :math:`H_{out} = \text{out\_features}`.
-       
+
         >>> m = nn.Linear(20, 30)
         >>> input = torch.randn(128, 20)
         >>> output = m(input)
         >>> print(output.size())
         torch.Size([128, 30])
     """
+
     def __init__(self, in_features: int, out_features: int) -> None:
         super(Linear, self).__init__()
         self.in_features = in_features
@@ -27,7 +29,7 @@ class Linear(nn.Module):
         # Initialize weight and bias
         self.weight = nn.Parameter(torch.randn(out_features, in_features))
         self.bias = nn.Parameter(torch.zeros(out_features))
-    
+
     def forward(self, input: torch.Tensor) -> torch.Tensor:
         """
             :param input: Tensor of shape [bsz, in_features]
@@ -40,7 +42,7 @@ class Linear(nn.Module):
 class MLP(torch.nn.Module):
     # 20 points
     def __init__(self, input_size: int, hidden_sizes: List[int], num_classes: int, activation: str = "relu"):
-        super(MLP, self).__init__() 
+        super(MLP, self).__init__()
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
         assert len(hidden_sizes) > 1, "You should at least have one hidden layer"
@@ -48,15 +50,15 @@ class MLP(torch.nn.Module):
         self.activation = activation
         assert activation in ['tanh', 'relu', 'sigmoid'], "Invalid choice of activation"
         self.hidden_layers, self.output_layer = self._build_layers(self.input_size, self.hidden_sizes, self.num_classes)
-        
+
         # Initialization
         self._initialize_linear_layer(self.output_layer)
         for layer in self.hidden_layers:
             self._initialize_linear_layer(layer)
-    
-    def _build_layers(self, input_size: int, 
-                        hidden_sizes: List[int], 
-                        num_classes: int) -> Tuple[nn.ModuleList, nn.Module]:
+
+    def _build_layers(self, input_size: int,
+                      hidden_sizes: List[int],
+                      num_classes: int) -> Tuple[nn.ModuleList, nn.Module]:
         """
         Build the layers for MLP. Be ware of handlling corner cases.
         :param input_size: An int
@@ -82,30 +84,33 @@ class MLP(torch.nn.Module):
 
         return hidden_layers, output_layer
 
-    
     def activation_fn(self, activation: str, inputs: torch.Tensor) -> torch.Tensor:
         """Process the inputs through different non-linearity functions according to the activation name. """
+
         if activation == 'tanh':
             return torch.tanh(inputs)  # Tanh is fine to use as it's not simple
         elif activation == 'relu':
-            return torch.max(inputs, torch.zeros_like(inputs))  # Custom ReLU
+            return torch.maximum(torch.tensor(0.0, device=inputs.device), inputs)  # Custom ReLU
         elif activation == 'sigmoid':
-            return 1 / (1 + torch.exp(-torch.clip(inputs, -100, 100)))  # Custom Sigmoid
-        
+            clamped_inputs = torch.clamp(inputs, min=-50, max=50)  # Prevents overflow in exp()
+            return 1 / (1 + torch.exp(-clamped_inputs))  # Cus
+        else:
+            raise ValueError(f"Invalid activation function: {activation}")  # Ensures function always returns a value
+
     def _initialize_linear_layer(self, module: nn.Module) -> None:
         """ For bias set to zeros. For weights set to glorot normal """
-        fan_in, fan_out = module.weight.shape  # Get input and output dimensions
-        std = torch.sqrt(torch.tensor(2.0 / (fan_in + fan_out)))
+        if isinstance(module, nn.Linear):  # Ensure it's a Linear layer
+            fan_in, fan_out = module.weight.shape  # Get input and output dimensions
+            std = (torch.tensor(2.0 / (fan_in + fan_out))) ** 0.5  # Compute Xavier std
+            module.weight.data.normal_(mean=0.0, std=float(std))  # Apply normal initialization
+            module.bias.data.zero_()  # Set bias to zeros
 
-        module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
-        module.bias.data.zero_()  # Set bias to zeros
-        
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """ Forward images and compute logits.
-        1. The images are first fattened to vectors. 
+        1. The images are first fattened to vectors.
         2. Forward the result to each layer in the self.hidden_layer with activation_fn
         3. Finally forward the result to the output_layer.
-        
+
         :param images: [batch, channels, width, height]
         :return logits: [batch, num_classes]
         """
@@ -116,7 +121,7 @@ class MLP(torch.nn.Module):
 
         # Step 2: Pass through hidden layers with activation
         for layer in self.hidden_layers:
-            x = layer(x)   # Pass through layers
+            x = layer(x)  # Pass through layers
             x = self.activation_fn(self.activation, x)  # Apply custom activation
 
         # Step 3: Pass through the output layer
