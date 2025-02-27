@@ -88,15 +88,15 @@ class MLP(torch.nn.Module):
         if activation == 'tanh':
             return torch.tanh(inputs)  # Tanh is fine to use as it's not simple
         elif activation == 'relu':
-            return torch.maximum(torch.tensor(0.0, device=inputs.device), inputs)  # Custom ReLU
+            return torch.max(inputs, torch.zeros_like(inputs))  # Custom ReLU
         elif activation == 'sigmoid':
-            return 1 / (1 + torch.exp(-inputs))  # Custom Sigmoid
+            return 1 / (1 + torch.exp(-torch.clip(inputs, -100, 100)))  # Custom Sigmoid
         
     def _initialize_linear_layer(self, module: nn.Module) -> None:
         """ For bias set to zeros. For weights set to glorot normal """
-        if isinstance(module, nn.Linear):  # Ensure it's a Linear layer
-            fan_in, fan_out = module.weight.shape  # Get input and output dimensions
-            std = torch.sqrt(torch.tensor(2.0 / (fan_in + fan_out)))  # Compute Xavier std
+        fan_in, fan_out = module.weight.shape  # Get input and output dimensions
+        std = torch.sqrt(torch.tensor(2.0 / (fan_in + fan_out)))
+        with torch.no_grad:
             module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
             module.bias.data.zero_()  # Set bias to zeros
         
