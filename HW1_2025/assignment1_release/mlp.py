@@ -96,9 +96,9 @@ class MLP(torch.nn.Module):
         """ For bias set to zeros. For weights set to glorot normal """
         fan_in, fan_out = module.weight.shape  # Get input and output dimensions
         std = torch.sqrt(torch.tensor(2.0 / (fan_in + fan_out)))
-        with torch.no_grad:
-            module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
-            module.bias.data.zero_()  # Set bias to zeros
+
+        module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
+        module.bias.data.zero_()  # Set bias to zeros
         
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         """ Forward images and compute logits.
