@@ -92,7 +92,7 @@ class MLP(torch.nn.Module):
         elif activation == 'sigmoid':
             return 1 / (1 + torch.exp(-inputs))  # Custom Sigmoid
         
-    def _initialize_linear_layer(self, module: Linear) -> None:
+    def _initialize_linear_layer(self, module: nn.Module) -> None:
         """ For bias set to zeros. For weights set to glorot normal """
         if isinstance(module, nn.Linear):  # Ensure it's a Linear layer
             fan_in, fan_out = module.weight.shape  # Get input and output dimensions
