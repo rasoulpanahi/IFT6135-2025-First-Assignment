@@ -14,7 +14,7 @@ class PatchEmbed(nn.Module):
         self.grid_size = img_size // patch_size
         self.num_patches = self.grid_size * self.grid_size
         
-        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size =1, stride =2)
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size =patch_size, stride =patch_size)
 
     def forward(self, x):
         """
@@ -73,8 +73,15 @@ class MixerBlock(nn.Module):
         self.mlp_channels = Mlp(dim, channels_dim, act_layer=act_layer, drop=drop)
 
     def forward(self, x):
-        x += self.mlp_tokens(self.norm1(x).transpose(1, 2)).transpose(1, 2)
-        x += self.mlp_channels(self.norm2(x))
+        y = self.norm1(x)
+        y = y.transpose(1, 2)
+        y = self.mlp_tokens(y)
+        y = y.transpose(1, 2)
+        x = x + y
+
+        y = self.norm2(x)
+        y = self.mlp_channels(y)
+        x = x + y
         return x
     
 
@@ -99,10 +106,12 @@ class MLPMixer(nn.Module):
     def init_weights(self, module):
         if isinstance(module, nn.Linear):
             nn.init.xavier_uniform_(module.weight)
-            nn.init.zeros_(module.bias)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
         elif isinstance(module, nn.Conv2d):
             nn.init.kaiming_normal_(module.weight)
-            nn.init.zeros_(module.bias)
+            if module.bias is not None:
+                nn.init.zeros_(module.bias)
         elif isinstance(module, nn.LayerNorm):
             nn.init.ones_(module.weight)
             nn.init.zeros_(module.bias)
