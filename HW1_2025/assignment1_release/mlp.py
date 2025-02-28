@@ -45,7 +45,7 @@ class MLP(torch.nn.Module):
         super(MLP, self).__init__()
         self.input_size = input_size
         self.hidden_sizes = hidden_sizes
-        assert len(hidden_sizes) > 1, "You should at least have one hidden layer"
+        assert len(hidden_sizes) > 0, "You should at least have one hidden layer"
         self.num_classes = num_classes
         self.activation = activation
         assert activation in ['tanh', 'relu', 'sigmoid'], "Invalid choice of activation"
@@ -79,7 +79,7 @@ class MLP(torch.nn.Module):
             prev_size = hidden_size
 
         # Build output layer
-        output_layer = nn.Linear(prev_size, num_classes)
+        output_layer = Linear(prev_size, num_classes)
         self._initialize_linear_layer(output_layer)
 
         return hidden_layers, output_layer
@@ -101,8 +101,8 @@ class MLP(torch.nn.Module):
         """ For bias set to zeros. For weights set to glorot normal """
         if isinstance(module, nn.Linear):  # Ensure it's a Linear layer
             fan_in, fan_out = module.weight.shape  # Get input and output dimensions
-            std = (torch.tensor(2.0 / (fan_in + fan_out))) ** 0.5  # Compute Xavier std
-            module.weight.data.normal_(mean=0.0, std=float(std))  # Apply normal initialization
+            std = (2.0 / (fan_in + fan_out)) ** 0.5  # Compute Xavier std
+            module.weight.data.normal_(mean=0.0, std=std)  # Apply normal initialization
             module.bias.data.zero_()  # Set bias to zeros
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
