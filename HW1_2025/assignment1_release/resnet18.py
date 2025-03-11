@@ -72,7 +72,7 @@ class ResNet18(nn.Module):
 
     def forward(self, images):
         """ input images and output logits """
-        x = self.conv1(x)
+        x = self.conv1(images)
         x = self.bn1(x)
         x = F.relu(x)
         x = self.layer1(x)
