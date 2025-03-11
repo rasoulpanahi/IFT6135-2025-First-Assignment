@@ -130,7 +130,7 @@ class MLPMixer(nn.Module):
         in the desired directory 
         """
         
-        if not.os.path.exists(logdir):
+        if not os.path.exists(logdir):
             os.makedirs(logdir)
         
         for i  , block in enumerate(self.blocks):
