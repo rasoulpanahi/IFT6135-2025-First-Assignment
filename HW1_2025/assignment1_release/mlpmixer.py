@@ -17,7 +17,7 @@ class PatchEmbed(nn.Module):
         self.num_patches = self.grid_size * self.grid_size
         
         # Uncomment this line and replace ? with correct values
-        #self.proj = nn.Conv2d(?, ?, kernel_size=?, stride=?)
+        self.proj = nn.Conv2d(in_chans, embed_dim, kernel_size=patch_size, stride=patch_size)
 
     def forward(self, x):
         """
@@ -113,14 +113,39 @@ class MLPMixer(nn.Module):
         :param images: [batch, 3, img_size, img_size]
         """
         # step1: Go through the patch embedding
+        x = self.patchemb(images)
         # step 2 Go through the mixer blocks
+        x = self.blocks(x)
         # step 3 go through layer norm
+        x = self.norm(x)
         # step 4 Global averaging spatially
+        x = x.mean(dim =1)
         # Classification
-        raise NotImplementedError
+        x = self.head(x)
+        return x
     
     def visualize(self, logdir):
-        """ Visualize the token mixer layer 
-        in the desired directory """
-        raise NotImplementedError
+        """ 
+        Visualize the token mixer layer 
+        in the desired directory 
+        """
+        
+        if not.os.path.exists(logdir):
+            os.makedirs(logdir)
+        
+        for i  , block in enumerate(self.blocks):
+            weights = block.mlp_tokens.fc1.weight.data.cpu()
+            num_kernels = weights.shape[0]
+            fig , axes = plt.subplots(1 , num_kernels , figsize = (num_kernels , 1) )
+            for j in range(num_kernels):
+                ax = axes[j]
+                kernel = weights[j , :].view(self.patchemb.num_patches , -1)        # reshape to 2D
+                kernel = (kernel - kernel.min()) / ( kernel.max() - kernel.min() )  # Normalize
+                ax.imshow(kernel , cmap = 'gray')
+                ax.axis('off')
+            plt.savefig(os.path.join(logdir , f'block_{i}_token_mixer.png'))
+            plt.close(fig)
+        
+        
+        
  

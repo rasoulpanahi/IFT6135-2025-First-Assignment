@@ -27,7 +27,7 @@ class BasicBlock(nn.Module):
 
         self.shortcut = nn.Sequential()
         if stride != 1 or in_planes != planes:
-           self.shortcut = nn.Sequential(
+            self.shortcut = nn.Sequential(
                nn.Conv2d(in_planes, planes,
                          kernel_size=1, stride=stride, bias=False),
                nn.BatchNorm2d(planes)
@@ -57,7 +57,7 @@ class ResNet18(nn.Module):
         super(ResNet18, self).__init__()
         # Uncomment the following lines and replace the ? with correct values
         self.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-        self.bn1 = nn.BatchNorm2d(?)
+        self.bn1 = nn.BatchNorm2d(64)
         self.layer1 = self._make_layer(64, 64, stride=1)
         self.layer2 = self._make_layer(64, 128, stride=2)
         self.layer3 = self._make_layer(128, 256, stride=2)
